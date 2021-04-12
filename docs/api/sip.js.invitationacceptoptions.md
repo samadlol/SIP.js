@@ -16,6 +16,7 @@ export interface InvitationAcceptOptions
 
 |  Property | Type | Description |
 |  --- | --- | --- |
-|  [sessionDescriptionHandlerModifiers](./sip.js.invitationacceptoptions.sessiondescriptionhandlermodifiers.md) | <code>Array&lt;SessionDescriptionHandlerModifier&gt;</code> | Modifiers to pass to SessionDescriptionHandler's getDescription() and setDescription(). |
-|  [sessionDescriptionHandlerOptions](./sip.js.invitationacceptoptions.sessiondescriptionhandleroptions.md) | <code>SessionDescriptionHandlerOptions</code> | Options to pass to SessionDescriptionHandler's getDescription() and setDescription(). |
+|  [extraHeaders](./sip.js.invitationacceptoptions.extraheaders.md) | <code>Array&lt;string&gt;</code> | Array of extra headers added to the response. |
+|  [sessionDescriptionHandlerModifiers](./sip.js.invitationacceptoptions.sessiondescriptionhandlermodifiers.md) | <code>Array&lt;SessionDescriptionHandlerModifier&gt;</code> | Modifiers to pass to SessionDescriptionHandler during the initial INVITE transaction. |
+|  [sessionDescriptionHandlerOptions](./sip.js.invitationacceptoptions.sessiondescriptionhandleroptions.md) | <code>SessionDescriptionHandlerOptions</code> | Options to pass to SessionDescriptionHandler during the initial INVITE transaction. |
 

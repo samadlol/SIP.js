@@ -4,8 +4,6 @@
 
 ```ts
 
-import { EventEmitter } from 'events';
-
 // @public
 export interface AckableIncomingResponseWithSession extends IncomingResponse {
     ack(options?: RequestOptions): OutgoingAckRequest;
@@ -172,12 +170,17 @@ export interface DialogState {
 //
 // @internal
 export class DigestAuthentication {
-    constructor(loggerFactory: LoggerFactory, username: string | undefined, password: string | undefined);
+    constructor(loggerFactory: LoggerFactory, ha1: string | undefined, username: string | undefined, password: string | undefined);
     authenticate(request: OutgoingRequestMessage, challenge: any, body?: string): boolean;
     // (undocumented)
     stale: boolean | undefined;
     toString(): string;
     }
+
+// Warning: (ae-internal-missing-underscore) The name "equivalentURI" should be prefixed with an underscore because the declaration is marked as @internal
+//
+// @internal
+export function equivalentURI(a: URI, b: URI): boolean;
 
 // @public
 export abstract class Exception extends Error {
@@ -470,6 +473,9 @@ export class Logger {
     // (undocumented)
     error(content: string): void;
     // (undocumented)
+    get level(): Levels;
+    set level(newLevel: Levels);
+    // (undocumented)
     log(content: string): void;
     // (undocumented)
     warn(content: string): void;
@@ -724,22 +730,22 @@ export interface OutgoingSubscribeRequestDelegate extends OutgoingRequestDelegat
 // @internal (undocumented)
 export class Parameters {
     constructor(parameters: {
-        [name: string]: string;
+        [name: string]: string | number | null | undefined;
     });
     // (undocumented)
     clearParams(): void;
     // (undocumented)
-    deleteParam(parameter: string): any;
+    deleteParam(key: string): string | null | undefined;
     // (undocumented)
-    getParam(key: string): string | undefined;
+    getParam(key: string): string | null | undefined;
     // (undocumented)
     hasParam(key: string): boolean;
     // (undocumented)
     parameters: {
-        [name: string]: string;
+        [name: string]: string | null;
     };
     // (undocumented)
-    setParam(key: string, value: any): void;
+    setParam(key: string, value: string | number | null | undefined): void;
 }
 
 // Warning: (ae-internal-missing-underscore) The name "Parser" should be prefixed with an underscore because the declaration is marked as @internal
@@ -923,7 +929,6 @@ export class SessionDialog extends Dialog implements Session {
     reinviteUserAgentClient: ReInviteUserAgentClient | undefined;
     // (undocumented)
     reinviteUserAgentServer: ReInviteUserAgentServer | undefined;
-    // (undocumented)
     reliableSequenceGuard(message: IncomingResponseMessage): boolean;
     // (undocumented)
     get sessionState(): SessionState;
@@ -1061,8 +1066,11 @@ export const Timers: {
 };
 
 // @public
-export abstract class Transaction extends EventEmitter {
+export abstract class Transaction {
     protected constructor(_transport: Transport, _user: TransactionUser, _id: string, _state: TransactionState, loggerCategory: string);
+    addStateChangeListener(listener: () => void, options?: {
+        once?: boolean;
+    }): void;
     dispose(): void;
     get id(): string;
     get kind(): string;
@@ -1070,9 +1078,11 @@ export abstract class Transaction extends EventEmitter {
     protected logger: Logger;
     // (undocumented)
     protected logTransportError(error: TransportError, message: string): void;
-    on(name: "stateChanged", callback: () => void): this;
+    // @internal
+    notifyStateChangeListeners(): void;
     // (undocumented)
     protected abstract onTransportError(error: TransportError): void;
+    removeStateChangeListener(listener: () => void): void;
     protected send(message: string): Promise<void>;
     // (undocumented)
     protected setState(state: TransactionState): void;
@@ -1127,7 +1137,11 @@ export class TransportError extends Exception {
 //
 // @public
 export class URI extends Parameters {
-    constructor(scheme: string, user: string, host: string, port?: number, parameters?: any, headers?: any);
+    constructor(scheme: string | undefined, user: string, host: string, port?: number, parameters?: {
+        [name: string]: string | number | null;
+    }, headers?: {
+        [name: string]: Array<string>;
+    });
     // (undocumented)
     get aor(): string;
     // (undocumented)
@@ -1135,11 +1149,15 @@ export class URI extends Parameters {
     // (undocumented)
     clone(): URI;
     // (undocumented)
-    deleteHeader(header: string): any;
+    deleteHeader(header: string): Array<string> | undefined;
     // (undocumented)
-    getHeader(name: string): string | undefined;
+    getHeader(name: string): Array<string> | undefined;
     // (undocumented)
     hasHeader(name: string): boolean;
+    // (undocumented)
+    headers: {
+        [name: string]: Array<string>;
+    };
     // (undocumented)
     get host(): string;
     set host(value: string);
@@ -1150,7 +1168,7 @@ export class URI extends Parameters {
     get scheme(): string;
     set scheme(value: string);
     // (undocumented)
-    setHeader(name: string, value: any): void;
+    setHeader(name: string, value: Array<string> | string): void;
     // (undocumented)
     toRaw(): string;
     // (undocumented)

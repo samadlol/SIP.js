@@ -6,7 +6,7 @@ module.exports = function(config) {
 
     // frameworks to use
     // available frameworks: https://npmjs.org/browse/keyword/karma-adapter
-    frameworks: ['jasmine'],
+    frameworks: ['jasmine', 'webpack'],
 
     // list of files / patterns to load in the browser
     files: [
@@ -24,6 +24,11 @@ module.exports = function(config) {
 
     webpack: {
       devtool: 'inline-source-map',
+      module: { rules: [ { test: /\.m?js/,
+        resolve: {
+	    fullySpecified: false
+	}
+      }]},
       mode: 'production'
     },
 
@@ -46,7 +51,14 @@ module.exports = function(config) {
     autoWatch: false,
 
     // you can define custom flags
-    customLaunchers: {},
+    customLaunchers: {
+      // --use-fake-ui-for-media-stream avoids the need to grant camera/microphone permissions.
+      // --use-fake-device-for-media-stream feeds a test pattern to getUserMedia() instead of live camera input.
+      ChromeHeadlessFakeMediaStream: {
+        base: 'ChromeHeadless',
+        flags: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream']
+      }
+    },
 
     // start these browsers
     // available browser launchers: https://npmjs.org/browse/keyword/karma-launcher

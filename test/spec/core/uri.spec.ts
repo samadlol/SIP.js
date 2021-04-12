@@ -1,4 +1,4 @@
-import { Grammar, URI } from "../../../src/core";
+import { Grammar, URI, equivalentURI } from "../../../src/core";
 
 // TODO:
 // These tests were ported to typescript verbatim.
@@ -94,7 +94,6 @@ describe("Core URI", () => {
       uri.setParam("KEY", "value");
       expect(uri.getParam("KEY")).toBe("value");
     });
-
   });
 
   describe(".hasParam", () => {
@@ -316,7 +315,8 @@ describe("Core URI", () => {
     expect(parsedURI).toBeUndefined();
   });
 
-  const toParse = "SIP:%61liCE@versaTICA.Com:6060;TRansport=TCp;Foo=ABc;baz?X-Header-1=AaA1&X-Header-2=BbB&x-header-1=AAA2";
+  const toParse =
+    "SIP:%61liCE@versaTICA.Com:6060;TRansport=TCp;Foo=ABc;baz?X-Header-1=AaA1&X-Header-2=BbB&x-header-1=AAA2";
 
   describe('URI.parse with "' + toParse + '"', () => {
     beforeEach(() => {
@@ -361,9 +361,19 @@ describe("Core URI", () => {
     itsMethod("parses header X-HEADER-2", "getHeader", "X-HEADER-2", ["BbB"]);
     itsMethod('doesn\'t parse missing header "nooo"', "getHeader", "nooo", undefined);
     // eslint-disable-next-line max-len
-    itsMethod("correctly toString()s itself", "toString", undefined, "sip:aliCE@versatica.com:6060;transport=tcp;foo=ABc;baz?X-Header-1=AaA1&X-Header-1=AAA2&X-Header-2=BbB");
+    itsMethod(
+      "correctly toString()s itself",
+      "toString",
+      undefined,
+      "sip:aliCE@versatica.com:6060;transport=tcp;foo=ABc;baz?X-Header-1=AaA1&X-Header-1=AAA2&X-Header-2=BbB"
+    );
     // eslint-disable-next-line max-len
-    itsMethod("correctly toRaw()s itself", "toRaw", undefined, "SIP:aliCE@versaTICA.Com:6060;transport=tcp;foo=ABc;baz?X-Header-1=AaA1&X-Header-1=AAA2&X-Header-2=BbB");
+    itsMethod(
+      "correctly toRaw()s itself",
+      "toRaw",
+      undefined,
+      "SIP:aliCE@versaTICA.Com:6060;transport=tcp;foo=ABc;baz?X-Header-1=AaA1&X-Header-1=AAA2&X-Header-2=BbB"
+    );
 
     const newUser = "Iñaki:PASSWD";
     describe('when setting the user to "' + newUser + '"', () => {
@@ -387,6 +397,98 @@ describe("Core URI", () => {
         uri.port = undefined;
         expect(uri.toString()).toEqual("sip:I%C3%B1aki:PASSWD@versatica.com");
       });
+    });
+  });
+
+  describe("equivalentURI", () => {
+    it("equivalent - 1", () => {
+      const a = Grammar.URIParse("sip:%61lice@atlanta.com;transport=TCP");
+      const b = Grammar.URIParse("sip:alice@AtLanTa.CoM;Transport=tcp");
+      expect(a instanceof URI).toBe(true);
+      expect(b instanceof URI).toBe(true);
+      if (a instanceof URI && b instanceof URI) {
+        expect(equivalentURI(a, b)).toEqual(true);
+      }
+    });
+
+    it("equivalent - 2", () => {
+      const a = Grammar.URIParse("sip:carol@chicago.com");
+      const b = Grammar.URIParse("sip:carol@chicago.com;security=off");
+      expect(a instanceof URI).toBe(true);
+      expect(b instanceof URI).toBe(true);
+      if (a instanceof URI && b instanceof URI) {
+        expect(equivalentURI(a, b)).toEqual(true);
+      }
+    });
+
+    it("equivalent - 3", () => {
+      const a = Grammar.URIParse("sip:biloxi.com;transport=tcp;method=REGISTER?to=sip:bob%40biloxi.com");
+      const b = Grammar.URIParse("sip:biloxi.com;method=REGISTER;transport=tcp?to=sip:bob%40biloxi.com");
+      expect(a instanceof URI).toBe(true);
+      expect(b instanceof URI).toBe(true);
+      if (a instanceof URI && b instanceof URI) {
+        expect(equivalentURI(a, b)).toEqual(true);
+      }
+    });
+
+    it("equivalent - 4", () => {
+      const a = Grammar.URIParse("sip:alice@atlanta.com?subject=project%20x&priority=urgent");
+      const b = Grammar.URIParse("sip:alice@atlanta.com?priority=urgent&subject=project%20x");
+      expect(a instanceof URI).toBe(true);
+      expect(b instanceof URI).toBe(true);
+      if (a instanceof URI && b instanceof URI) {
+        expect(equivalentURI(a, b)).toEqual(true);
+      }
+    });
+
+    it("not equivalent - different usernames", () => {
+      const a = Grammar.URIParse("SIP:ALICE@AtLanTa.CoM;Transport=udp");
+      const b = Grammar.URIParse("sip:alice@AtLanTa.CoM;Transport=UDP");
+      expect(a instanceof URI).toBe(true);
+      expect(b instanceof URI).toBe(true);
+      if (a instanceof URI && b instanceof URI) {
+        expect(equivalentURI(a, b)).toEqual(false);
+      }
+    });
+
+    it("not equivalent - can resolve to different ports", () => {
+      const a = Grammar.URIParse("sip:bob@biloxi.com");
+      const b = Grammar.URIParse("sip:bob@biloxi.com:5060");
+      expect(a instanceof URI).toBe(true);
+      expect(b instanceof URI).toBe(true);
+      if (a instanceof URI && b instanceof URI) {
+        expect(equivalentURI(a, b)).toEqual(false);
+      }
+    });
+
+    it("not equivalent - can resolve to different transports", () => {
+      const a = Grammar.URIParse("sip:bob@biloxi.com");
+      const b = Grammar.URIParse("sip:bob@biloxi.com;transport=udp");
+      expect(a instanceof URI).toBe(true);
+      expect(b instanceof URI).toBe(true);
+      if (a instanceof URI && b instanceof URI) {
+        expect(equivalentURI(a, b)).toEqual(false);
+      }
+    });
+
+    it("not equivalent - different header component", () => {
+      const a = Grammar.URIParse("sip:carol@chicago.com");
+      const b = Grammar.URIParse("sip:carol@chicago.com?Subject=next%20meeting");
+      expect(a instanceof URI).toBe(true);
+      expect(b instanceof URI).toBe(true);
+      if (a instanceof URI && b instanceof URI) {
+        expect(equivalentURI(a, b)).toEqual(false);
+      }
+    });
+
+    it("not equivalent - transitive", () => {
+      const a = Grammar.URIParse("sip:carol@chicago.com;security=on");
+      const b = Grammar.URIParse("sip:carol@chicago.com;security=off");
+      expect(a instanceof URI).toBe(true);
+      expect(b instanceof URI).toBe(true);
+      if (a instanceof URI && b instanceof URI) {
+        expect(equivalentURI(a, b)).toEqual(false);
+      }
     });
   });
 });

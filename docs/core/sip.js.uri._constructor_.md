@@ -9,17 +9,21 @@ Constructor
 <b>Signature:</b>
 
 ```typescript
-constructor(scheme: string, user: string, host: string, port?: number, parameters?: any, headers?: any);
+constructor(scheme: string | undefined, user: string, host: string, port?: number, parameters?: {
+        [name: string]: string | number | null;
+    }, headers?: {
+        [name: string]: Array<string>;
+    });
 ```
 
 ## Parameters
 
 |  Parameter | Type | Description |
 |  --- | --- | --- |
-|  scheme | <code>string</code> |  |
+|  scheme | <code>string &#124; undefined</code> |  |
 |  user | <code>string</code> |  |
 |  host | <code>string</code> |  |
 |  port | <code>number</code> |  |
-|  parameters | <code>any</code> |  |
-|  headers | <code>any</code> |  |
+|  parameters | <code>{</code><br/><code>        [name: string]: string &#124; number &#124; null;</code><br/><code>    }</code> |  |
+|  headers | <code>{</code><br/><code>        [name: string]: Array&lt;string&gt;;</code><br/><code>    }</code> |  |
 

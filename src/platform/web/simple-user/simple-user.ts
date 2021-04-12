@@ -22,7 +22,7 @@ import {
   UserAgentState
 } from "../../../api";
 import { Logger } from "../../../core";
-import { SessionDescriptionHandler } from "../session-description-handler";
+import { SessionDescriptionHandler, SessionDescriptionHandlerOptions } from "../session-description-handler";
 import { Transport } from "../transport";
 import { SimpleUserDelegate } from "./simple-user-delegate";
 import { SimpleUserOptions } from "./simple-user-options";
@@ -44,6 +44,7 @@ export class SimpleUser {
   private connectRequested = false;
   private logger: Logger;
   private held = false;
+  private muted = false;
   private options: SimpleUserOptions;
   private registerer: Registerer | undefined = undefined;
   private registerRequested = false;
@@ -211,24 +212,60 @@ export class SimpleUser {
     return (this.options.userAgentOptions && this.options.userAgentOptions.displayName) || "Anonymous";
   }
 
-  /** The local audio track, if available. */
+  /** The local media stream. Undefined if call not answered. */
+  get localMediaStream(): MediaStream | undefined {
+    const sdh = this.session?.sessionDescriptionHandler;
+    if (!sdh) {
+      return undefined;
+    }
+    if (!(sdh instanceof SessionDescriptionHandler)) {
+      throw new Error("Session description handler not instance of web SessionDescriptionHandler");
+    }
+    return sdh.localMediaStream;
+  }
+
+  /** The remote media stream. Undefined if call not answered. */
+  get remoteMediaStream(): MediaStream | undefined {
+    const sdh = this.session?.sessionDescriptionHandler;
+    if (!sdh) {
+      return undefined;
+    }
+    if (!(sdh instanceof SessionDescriptionHandler)) {
+      throw new Error("Session description handler not instance of web SessionDescriptionHandler");
+    }
+    return sdh.remoteMediaStream;
+  }
+
+  /**
+   * The local audio track, if available.
+   * @deprecated Use localMediaStream and get track from the stream.
+   */
   get localAudioTrack(): MediaStreamTrack | undefined {
-    return this.getSenderTrack("audio");
+    return this.localMediaStream?.getTracks().find((track) => track.kind === "audio");
   }
 
-  /** The local video track, if available. */
+  /**
+   * The local video track, if available.
+   * @deprecated Use localMediaStream and get track from the stream.
+   */
   get localVideoTrack(): MediaStreamTrack | undefined {
-    return this.getSenderTrack("video");
+    return this.localMediaStream?.getTracks().find((track) => track.kind === "video");
   }
 
-  /** The remote audio track, if available. */
+  /**
+   * The remote audio track, if available.
+   * @deprecated Use remoteMediaStream and get track from the stream.
+   */
   get remoteAudioTrack(): MediaStreamTrack | undefined {
-    return this.getReceiverTrack("audio");
+    return this.remoteMediaStream?.getTracks().find((track) => track.kind === "audio");
   }
 
-  /** The remote video track, if available. */
+  /**
+   * The remote video track, if available.
+   * @deprecated Use remoteMediaStream and get track from the stream.
+   */
   get remoteVideoTrack(): MediaStreamTrack | undefined {
-    return this.getReceiverTrack("video");
+    return this.remoteMediaStream?.getTracks().find((track) => track.kind === "video");
   }
 
   /**
@@ -332,6 +369,8 @@ export class SimpleUser {
    * Resolves when the INVITE request is sent, otherwise rejects.
    * Use `onCallAnswered` delegate method to determine if Session is established.
    * @param destination - The target destination to call. A SIP address to send the INVITE to.
+   * @param inviterOptions - Optional options for Inviter constructor.
+   * @param inviterInviteOptions - Optional options for Inviter.invite().
    */
   public call(
     destination: string,
@@ -387,6 +426,7 @@ export class SimpleUser {
    * Accept an incoming INVITE request creating a new Session.
    * Resolves with the response is sent, otherwise rejects.
    * Use `onCallAnswered` delegate method to determine if and when call is established.
+   * @param invitationAcceptOptions - Optional options for Inviter.accept().
    */
   public answer(invitationAcceptOptions?: InvitationAcceptOptions): Promise<void> {
     this.logger.log(`[${this.id}] Accepting Invitation...`);
@@ -495,8 +535,7 @@ export class SimpleUser {
    * True if sender's media track is disabled.
    */
   public isMuted(): boolean {
-    const track = this.localAudioTrack || this.localVideoTrack;
-    return track ? !track.enabled : false;
+    return this.muted;
   }
 
   /**
@@ -569,11 +608,8 @@ export class SimpleUser {
   /** Media constraints. */
   private get constraints(): { audio: boolean; video: boolean } {
     let constraints = { audio: true, video: false }; // default to audio only calls
-    if (this.options.media && this.options.media.constraints) {
+    if (this.options.media?.constraints) {
       constraints = { ...this.options.media.constraints };
-      if (!constraints.audio && !constraints.video) {
-        throw new Error("Invalid media constraints - audio and/or video must be true.");
-      }
     }
     return constraints;
   }
@@ -663,6 +699,29 @@ export class SimpleUser {
   }
 
   /** Helper function to enable/disable media tracks. */
+  private enableReceiverTracks(enable: boolean): void {
+    if (!this.session) {
+      throw new Error("Session does not exist.");
+    }
+
+    const sessionDescriptionHandler = this.session.sessionDescriptionHandler;
+    if (!(sessionDescriptionHandler instanceof SessionDescriptionHandler)) {
+      throw new Error("Session's session description handler not instance of SessionDescriptionHandler.");
+    }
+
+    const peerConnection = sessionDescriptionHandler.peerConnection;
+    if (!peerConnection) {
+      throw new Error("Peer connection closed.");
+    }
+
+    peerConnection.getReceivers().forEach((receiver) => {
+      if (receiver.track) {
+        receiver.track.enabled = enable;
+      }
+    });
+  }
+
+  /** Helper function to enable/disable media tracks. */
   private enableSenderTracks(enable: boolean): void {
     if (!this.session) {
       throw new Error("Session does not exist.");
@@ -674,59 +733,15 @@ export class SimpleUser {
     }
 
     const peerConnection = sessionDescriptionHandler.peerConnection;
+    if (!peerConnection) {
+      throw new Error("Peer connection closed.");
+    }
+
     peerConnection.getSenders().forEach((sender) => {
       if (sender.track) {
         sender.track.enabled = enable;
       }
     });
-  }
-
-  /** The receiver media track, if available. */
-  private getReceiverTrack(kind: "audio" | "video"): MediaStreamTrack | undefined {
-    if (!this.session) {
-      this.logger.warn(`[${this.id}] getReceiverTrack - session undefined`);
-      return undefined;
-    }
-
-    const sessionDescriptionHandler = this.session.sessionDescriptionHandler;
-    if (!sessionDescriptionHandler) {
-      this.logger.warn(`[${this.id}] getReceiverTrack - session description handler undefined`);
-      return undefined;
-    }
-
-    if (!(sessionDescriptionHandler instanceof SessionDescriptionHandler)) {
-      throw new Error("Session's session description handler not instance of SessionDescriptionHandler.");
-    }
-
-    const peerConnection = sessionDescriptionHandler.peerConnection;
-    const rtpReceiver = peerConnection.getReceivers().find((receiver) => {
-      return receiver.track.kind === kind ? true : false;
-    });
-    return rtpReceiver ? rtpReceiver.track : undefined;
-  }
-
-  /** The sender media track, if available. */
-  private getSenderTrack(kind: "audio" | "video"): MediaStreamTrack | undefined {
-    if (!this.session) {
-      this.logger.warn(`[${this.id}] getSenderTrack - session undefined`);
-      return undefined;
-    }
-
-    const sessionDescriptionHandler = this.session.sessionDescriptionHandler;
-    if (!sessionDescriptionHandler) {
-      this.logger.warn(`[${this.id}] getSenderTrack - session description handler undefined`);
-      return undefined;
-    }
-
-    if (!(sessionDescriptionHandler instanceof SessionDescriptionHandler)) {
-      throw new Error("Session's session description handler not instance of SessionDescriptionHandler.");
-    }
-
-    const peerConnection = sessionDescriptionHandler.peerConnection;
-    const rtpSender = peerConnection.getSenders().find((sender) => {
-      return sender.track && sender.track.kind === kind ? true : false;
-    });
-    return rtpSender && rtpSender.track ? rtpSender.track : undefined;
   }
 
   /**
@@ -887,6 +902,7 @@ export class SimpleUser {
     if (!this.session) {
       return Promise.reject(new Error("Session does not exist."));
     }
+    const session = this.session;
 
     // Just resolve if we are already in correct state
     if (this.held === hold) {
@@ -902,12 +918,16 @@ export class SimpleUser {
       requestDelegate: {
         onAccept: (): void => {
           this.held = hold;
+          this.enableReceiverTracks(!this.held);
+          this.enableSenderTracks(!this.held && !this.muted);
           if (this.delegate && this.delegate.onCallHold) {
             this.delegate.onCallHold(this.held);
           }
         },
         onReject: (): void => {
           this.logger.warn(`[${this.id}] re-invite request was rejected`);
+          this.enableReceiverTracks(!this.held);
+          this.enableSenderTracks(!this.held && !this.muted);
           if (this.delegate && this.delegate.onCallHold) {
             this.delegate.onCallHold(this.held);
           }
@@ -915,18 +935,33 @@ export class SimpleUser {
       }
     };
 
-    // Use hold modifier to produce the appropriate SDP offer to place call on hold
-    if (hold) {
-      options.sessionDescriptionHandlerModifiers = [
-        (description): Promise<RTCSessionDescriptionInit> => sessionDescriptionHandler.holdModifier(description)
-      ];
-    }
+    // Session properties used to pass options to the SessionDescriptionHandler:
+    //
+    // 1) Session.sessionDescriptionHandlerOptions
+    //    SDH options for the initial INVITE transaction.
+    //    - Used in all cases when handling the initial INVITE transaction as either UAC or UAS.
+    //    - May be set directly at anytime.
+    //    - May optionally be set via constructor option.
+    //    - May optionally be set via options passed to Inviter.invite() or Invitation.accept().
+    //
+    // 2) Session.sessionDescriptionHandlerOptionsReInvite
+    //    SDH options for re-INVITE transactions.
+    //    - Used in all cases when handling a re-INVITE transaction as either UAC or UAS.
+    //    - May be set directly at anytime.
+    //    - May optionally be set via constructor option.
+    //    - May optionally be set via options passed to Session.invite().
+
+    const sessionDescriptionHandlerOptions = session.sessionDescriptionHandlerOptionsReInvite as SessionDescriptionHandlerOptions;
+    sessionDescriptionHandlerOptions.hold = hold;
+    session.sessionDescriptionHandlerOptionsReInvite = sessionDescriptionHandlerOptions;
 
     // Send re-INVITE
     return this.session
       .invite(options)
       .then(() => {
-        this.enableSenderTracks(!hold); // mute/unmute
+        // preemptively enable/disable tracks
+        this.enableReceiverTracks(!hold);
+        this.enableSenderTracks(!hold && !this.muted);
       })
       .catch((error: Error) => {
         if (error instanceof RequestPendingError) {
@@ -951,7 +986,9 @@ export class SimpleUser {
       return;
     }
 
-    this.enableSenderTracks(!mute);
+    this.muted = mute;
+
+    this.enableSenderTracks(!this.held && !this.muted);
   }
 
   /** Helper function to attach local media to html elements. */
@@ -960,14 +997,18 @@ export class SimpleUser {
       throw new Error("Session does not exist.");
     }
 
-    if (this.options.media && this.options.media.local && this.options.media.local.video) {
-      const localVideoTrack = this.localVideoTrack;
-      if (localVideoTrack) {
-        const localStream = new MediaStream([localVideoTrack]);
-        this.options.media.local.video.srcObject = localStream;
-        this.options.media.local.video.volume = 0;
-        this.options.media.local.video.play();
+    const mediaElement = this.options.media?.local?.video;
+    if (mediaElement) {
+      const localStream = this.localMediaStream;
+      if (!localStream) {
+        throw new Error("Local media stream undefiend.");
       }
+      mediaElement.srcObject = localStream;
+      mediaElement.volume = 0;
+      mediaElement.play().catch((error: Error) => {
+        this.logger.error(`[${this.id}] Failed to play local media`);
+        this.logger.error(error.message);
+      });
     }
   }
 
@@ -977,34 +1018,27 @@ export class SimpleUser {
       throw new Error("Session does not exist.");
     }
 
-    if (this.options.media && this.options.media.remote) {
-      const remoteAudioTrack = this.remoteAudioTrack;
-      const remoteVideoTrack = this.remoteVideoTrack;
-      const remoteStream = new MediaStream();
+    const mediaElement = this.options.media?.remote?.video || this.options.media?.remote?.audio;
 
-      // If there is a video element, both audio and video will be attached that element.
-      if (this.options.media.remote.video) {
-        if (remoteAudioTrack) {
-          remoteStream.addTrack(remoteAudioTrack);
-        }
-        if (remoteVideoTrack) {
-          remoteStream.addTrack(remoteVideoTrack);
-        }
-        this.options.media.remote.video.srcObject = remoteStream;
-        this.options.media.remote.video.play().catch((error: Error) => {
-          this.logger.error(`[${this.id}] Error playing video`);
+    if (mediaElement) {
+      const remoteStream = this.remoteMediaStream;
+      if (!remoteStream) {
+        throw new Error("Remote media stream undefiend.");
+      }
+      mediaElement.autoplay = true; // Safari hack, because you cannot call .play() from a non user action
+      mediaElement.srcObject = remoteStream;
+      mediaElement.play().catch((error: Error) => {
+        this.logger.error(`[${this.id}] Failed to play remote media`);
+        this.logger.error(error.message);
+      });
+      remoteStream.onaddtrack = (): void => {
+        this.logger.log(`[${this.id}] Remote media onaddtrack`);
+        mediaElement.load(); // Safari hack, as it doesn't work otheriwse
+        mediaElement.play().catch((error: Error) => {
+          this.logger.error(`[${this.id}] Failed to play remote media`);
           this.logger.error(error.message);
         });
-      } else if (this.options.media.remote.audio) {
-        if (remoteAudioTrack) {
-          remoteStream.addTrack(remoteAudioTrack);
-          this.options.media.remote.audio.srcObject = remoteStream;
-          this.options.media.remote.audio.play().catch((error: Error) => {
-            this.logger.error(`[${this.id}] Error playing audio`);
-            this.logger.error(error.message);
-          });
-        }
-      }
+      };
     }
   }
 

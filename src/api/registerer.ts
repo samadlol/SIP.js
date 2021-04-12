@@ -1,7 +1,14 @@
-import { EventEmitter } from "events";
-
-import { C, Grammar, Logger, OutgoingRegisterRequest, OutgoingRequestMessage, URI, NameAddrHeader } from "../core";
-import { _makeEmitter, Emitter } from "./emitter";
+import {
+  C,
+  Grammar,
+  Logger,
+  OutgoingRegisterRequest,
+  OutgoingRequestMessage,
+  URI,
+  equivalentURI,
+  NameAddrHeader
+} from "../core";
+import { Emitter, EmitterImpl } from "./emitter";
 import { RequestPendingError } from "./exceptions";
 import { RegistererOptions } from "./registerer-options";
 import { RegistererRegisterOptions } from "./registerer-register-options";
@@ -14,21 +21,13 @@ import { UserAgent } from "./user-agent";
  * @public
  */
 export class Registerer {
-  /** Default registerer options. */
-  private static readonly defaultOptions: Required<RegistererOptions> = {
-    expires: 600,
-    extraContactHeaderParams: [],
-    extraHeaders: [],
-    logConfiguration: true,
-    instanceId: "",
-    params: {},
-    regId: 0,
-    registrar: new URI("sip", "anonymous", "anonymous.invalid")
-  };
+  private static readonly defaultExpires = 600;
+  private static readonly defaultRefreshFrequency = 99;
 
   private disposed = false;
   private id: string;
   private expires: number;
+  private refreshFrequency: number;
   private logger: Logger;
   private options: RegistererOptions;
   private request: OutgoingRequestMessage;
@@ -46,12 +45,12 @@ export class Registerer {
   /** The registration state. */
   private _state: RegistererState = RegistererState.Initial;
   /** Emits when the registration state changes. */
-  private _stateEventEmitter = new EventEmitter();
+  private _stateEventEmitter: EmitterImpl<RegistererState>;
 
   /** True is waiting for final response to outstanding REGISTER request. */
   private _waiting = false;
   /** Emits when waiting changes. */
-  private _waitingEventEmitter = new EventEmitter();
+  private _waitingEventEmitter: EmitterImpl<boolean>;
 
   /**
    * Constructs a new instance of the `Registerer` class.
@@ -59,6 +58,12 @@ export class Registerer {
    * @param options - Options bucket. See {@link RegistererOptions} for details.
    */
   public constructor(userAgent: UserAgent, options: RegistererOptions = {}) {
+    // state emitter
+    this._stateEventEmitter = new EmitterImpl<RegistererState>();
+
+    // waiting emitter
+    this._waitingEventEmitter = new EmitterImpl<boolean>();
+
     // Set user agent
     this.userAgent = userAgent;
 
@@ -69,7 +74,7 @@ export class Registerer {
     // Initialize configuration
     this.options = {
       // start with the default option values
-      ...Registerer.defaultOptions,
+      ...Registerer.defaultOptions(),
       // set the appropriate default registrar
       ...{ registrar: defaultUserAgentRegistrar },
       // apply any options passed in via the constructor
@@ -117,9 +122,17 @@ export class Registerer {
     );
 
     // Registration expires
-    this.expires = this.options.expires || Registerer.defaultOptions.expires;
+    this.expires = this.options.expires || Registerer.defaultExpires;
     if (this.expires < 0) {
       throw new Error("Invalid expires.");
+    }
+
+    // Interval at which re-REGISTER requests are sent
+    this.refreshFrequency = this.options.refreshFrequency || Registerer.defaultRefreshFrequency;
+    if (this.refreshFrequency < 50 || this.refreshFrequency > 99) {
+      throw new Error(
+        "Invalid refresh frequency. The value represents a percentage of the expiration time and should be between 50 and 99."
+      );
     }
 
     // initialize logger
@@ -145,6 +158,21 @@ export class Registerer {
 
     // Add to the user agent's session collection.
     this.userAgent._registerers[this.id] = this;
+  }
+
+  /** Default registerer options. */
+  private static defaultOptions(): Required<RegistererOptions> {
+    return {
+      expires: Registerer.defaultExpires,
+      extraContactHeaderParams: [],
+      extraHeaders: [],
+      logConfiguration: true,
+      instanceId: "",
+      params: {},
+      regId: 0,
+      registrar: new URI("sip", "anonymous", "anonymous.invalid"),
+      refreshFrequency: Registerer.defaultRefreshFrequency
+    };
   }
 
   // http://stackoverflow.com/users/109538/broofa
@@ -223,7 +251,7 @@ export class Registerer {
 
   /** Emits when the registerer state changes. */
   public get stateChange(): Emitter<RegistererState> {
-    return _makeEmitter(this._stateEventEmitter);
+    return this._stateEventEmitter;
   }
 
   /** Destructor. */
@@ -260,7 +288,12 @@ export class Registerer {
       // If we are waiting for an outstanding request, wait for it to finish and then try closing.
       // Otherwise just try closing.
       if (this.waiting) {
-        this.waitingChange.addListener(() => doClose(), { once: true });
+        this.waitingChange.addListener(
+          () => {
+            doClose();
+          },
+          { once: true }
+        );
       } else {
         doClose();
       }
@@ -360,10 +393,26 @@ export class Registerer {
           if (!contact) {
             throw new Error("Contact undefined");
           }
-          if (contact.uri.user === this.userAgent.contact.uri.user) {
+
+          if (this.userAgent.contact.pubGruu && equivalentURI(contact.uri, this.userAgent.contact.pubGruu)) {
             expires = Number(contact.getParam("expires"));
             break;
           }
+          // If we are using a randomly generated user name (which is the default behavior)
+          if (this.userAgent.configuration.contactName === "") {
+            // compare the user portion of the URI under the assumption that it will be unique
+            if (contact.uri.user === this.userAgent.contact.uri.user) {
+              expires = Number(contact.getParam("expires"));
+              break;
+            }
+          } else {
+            // otherwise use comparision rules in Section 19.1.4
+            if (equivalentURI(contact.uri, this.userAgent.contact.uri)) {
+              expires = Number(contact.getParam("expires"));
+              break;
+            }
+          }
+
           contact = undefined;
         }
 
@@ -639,11 +688,11 @@ export class Registerer {
     this.clearTimers();
 
     // Re-Register before the expiration interval has elapsed.
-    // For that, decrease the expires value. ie: 3 seconds
+    // For that, calculate the delay as a percentage of the expiration time
     this.registrationTimer = setTimeout(() => {
       this.registrationTimer = undefined;
       this.register();
-    }, expires * 1000 - 3000);
+    }, (this.refreshFrequency / 100) * expires * 1000);
 
     // We are unregistered if the registration expires.
     this.registrationExpiredTimer = setTimeout(() => {
@@ -717,7 +766,7 @@ export class Registerer {
     // Transition
     this._state = newState;
     this.logger.log(`Registration transitioned to state ${this._state}`);
-    this._stateEventEmitter.emit("event", this._state);
+    this._stateEventEmitter.emit(this._state);
 
     // Dispose
     if (newState === RegistererState.Terminated) {
@@ -732,7 +781,7 @@ export class Registerer {
 
   /** Emits when the registerer waiting state changes. */
   private get waitingChange(): Emitter<boolean> {
-    return _makeEmitter(this._waitingEventEmitter);
+    return this._waitingEventEmitter;
   }
 
   /**
@@ -744,7 +793,7 @@ export class Registerer {
     }
     this._waiting = waiting;
     this.logger.log(`Waiting toggled to ${this._waiting}`);
-    this._waitingEventEmitter.emit("event", this._waiting);
+    this._waitingEventEmitter.emit(this._waiting);
   }
 
   /** Hopefully helpful as the standard behavior has been found to be unexpected. */

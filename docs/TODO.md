@@ -1,10 +1,9 @@
 # Release Road Map
 
-## 0.16.x
+## 0.18.x
 
-- tighten up tslint and lint api, core, demo and tests
-- review packaging best practices (es7, es6, drop es5)
-- free core and API from DOM and Node dependencies
+- free core and API from DOM dependencies
+- complete more work in progress
 - more documentation
 - more tests
 - bug fixes
@@ -12,34 +11,30 @@
 
 # Work in Progress
 
-## Documentation
-
-- Add documentation for "SessionDescriptionHandler - WebRTC"
-
-## Tests
-
-- _Unit_ tests are being written for low level "core" components (Transaction, Transport)
-- _Integration_ tests are being written high level "api" components (Session, Subscription)
-  - Need to write more integration tests; Publisher, UserAgent, SimpleUser, etc
-
-## Dependencies
+## Dev Dependencies
 
 ### api-extractor
 
 - issue updating @microsoft/api-extractor past 7.7.11 https://github.com/microsoft/rushstack/issues/1830
 
-### karma-jasmine
+## Tests
 
-- issue updating past 3.0.3 https://github.com/karma-runner/karma-jasmine/issues/256
+- _Unit_ tests are being written for low level "core" components (i.e. Transaction, Transport)
+- _Integration_ tests are being written high level "api" components (i.e. Session, Subscription)
+  - Need to write more integration tests: Publisher, UserAgent, SimpleUser, etc
 
 ## Source
 
 ### API - Miscellaneous
 
+- UserAgent: The `contact` should be configurable. Related to URI and Grammar work. Issue #791.
 - UserAgent: Should support multiple servers (or multiple Transports). Issue #706.
 - Registerer: There is no good way to know if there is a request in progress (currently throws exception). Perhaps Registering/Unregistering state?
-- Review Allowed Methods and Allow header so configurable/variable in more reasonable fashion
-- Make sure all options buckets are deep copied
+- Registerer: Re-registration is current -3 seconds which seems not so good. Look at pjsip and others to see what they have done.
+- Review all deprecated to make sure an alternative is provided that is something other than TBD.
+- Review Allowed Methods and Allow header so configurable/variable in more reasonable fashion.
+- Need alternatives for all hacks like `hackViaTcp`.
+- Make sure all options buckets are deep copied.
 
 ### Core - Miscellaneous
 
@@ -56,10 +51,11 @@
 - Extra headers array approach is error prone
 - Timers and some associated timer code doesn't support unreliable transports (UDP for example)
 
-### Grammar - Refresh
+### Grammar & URI - Refresh
 
 - grammar.ts has everything typed as any
 - parsed URIs are not able to always be matched to configured URI because of typing issues
+- Cleanup URI class, should not default to "sip" scheme, get rid of useless type checking
 - URI constructor doesn't allow user of type undefined, but grammar passed undefined is no user parsed
 - URI should be strongly typed (currently using any for constructor params)
 - URI allows "" for user and 0 for port which is confusing and should probably be undefined instead
@@ -67,17 +63,28 @@
 - IncomingMessage class has public properties that may not be set (!), internally generated 408 for example
 - Handling incoming REGISTER, "Contact: \*" header fails to parse - there's a test written for it
 
-### SessionDescriptionHandler - Refresh
+#### Quick research on TypeScript parsers (from James Criscuolo)
 
-- Web (and React) versions need to be overhauled (events removed, peer connection observer added, etc, etc)
-- SDH options & SDH modifiers options are applied somewhat ambiguously
-  - This behavior was ported from legacy code and the issue punted down the road.
-- Trickle ICE Support: https://tools.ietf.org/id/draft-ietf-mmusic-trickle-ice-sip-11.html
+Non-exhaustive research on these parsers, generally it seems like there is nothing both popular and well-typed:
+
+- _ts-pegjs_: we currently use this on top of pegjs (it's not separate). I don't know how far typing can go, but it'd be the lowest work.
+- _antlr4ts_: antlr4 is a fairly well-used grammar parser, and they built a separate ts project (don't know if its typescript from the ground up). What I don't like is it incurs a runtime dependency.
+- _tspeg_: this one has very few users, but if it were popular, it would be exactly what we want. It is currently maintained (has been since it was made about 1.25 years ago), is strongly typed throughout, and outputs classes and interfaces.
+
+### SessionDescriptionHandler - Miscellaneous
+
+- Redesign the way options and modifiers are passed to SDH via `Session` as it is currently confusing at best
+- Trickle ICE Support: https://tools.ietf.org/html/draft-ietf-mmusic-trickle-ice-sip-18
 - Hold SDP offer too large for UDP
 
-### URI - Refresh
+### Session Timers - Issue #18
 
-- Cleanup URI class, should not default to "sip" scheme, get rid of useless type checking
+- There is an old branch for it which perhaps can be pulled forward.
+
+### Transport - TCP Support
+
+- Support for "stream-oriented" transports: https://tools.ietf.org/html/rfc3261#section-18.3
+- This current Transport interface only supports "message-oriented" transports. Issue #818.
 
 ## REFER handling - it has evolved over time and we are out of date
 
