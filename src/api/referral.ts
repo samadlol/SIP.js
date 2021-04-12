@@ -26,11 +26,7 @@ export class Referral {
   }
 
   public get replaces(): string | undefined {
-    const value = this.referTo.uri.getHeader("replaces");
-    if (value instanceof Array) {
-      return value[0];
-    }
-    return value;
+    return this.referTo.uri.getHeader("replaces");
   }
 
   /** Incoming REFER request message. */

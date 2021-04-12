@@ -4,15 +4,7 @@
 
 ```ts
 
-// @public
-export class Ack {
-    // Warning: (ae-forgotten-export) The symbol "IncomingAckRequest" needs to be exported by the entry point index.d.ts
-    //
-    // @internal
-    constructor(incomingAckRequest: IncomingAckRequest);
-    // Warning: (ae-forgotten-export) The symbol "IncomingRequestMessage" needs to be exported by the entry point index.d.ts
-    get request(): IncomingRequestMessage;
-}
+import { EventEmitter } from 'events';
 
 // @public
 export interface BodyAndContentType {
@@ -29,6 +21,7 @@ export class Bye {
     // Warning: (ae-forgotten-export) The symbol "ResponseOptions" needs to be exported by the entry point index.d.ts
     accept(options?: ResponseOptions): Promise<void>;
     reject(options?: ResponseOptions): Promise<void>;
+    // Warning: (ae-forgotten-export) The symbol "IncomingRequestMessage" needs to be exported by the entry point index.d.ts
     get request(): IncomingRequestMessage;
 }
 
@@ -53,24 +46,6 @@ export interface Emitter<T> {
     removeListener(listener: (data: T) => void): void;
 }
 
-// Warning: (ae-internal-missing-underscore) The name "EmitterImpl" should be prefixed with an underscore because the declaration is marked as @internal
-//
-// @internal
-export class EmitterImpl<T> implements Emitter<T> {
-    addListener(listener: (data: T) => void, options?: {
-        once?: boolean;
-    }): void;
-    emit(data: T): void;
-    // @deprecated
-    off(listener: (data: T) => void): void;
-    // @deprecated
-    on(listener: (data: T) => void): void;
-    // @deprecated
-    once(listener: (data: T) => void): void;
-    removeAllListeners(): void;
-    removeListener(listener: (data: T) => void): void;
-}
-
 // @public
 export class Info {
     // Warning: (ae-forgotten-export) The symbol "IncomingInfoRequest" needs to be exported by the entry point index.d.ts
@@ -89,6 +64,7 @@ export class Invitation extends Session {
     // @internal
     constructor(userAgent: UserAgent, incomingInviteRequest: IncomingInviteRequest);
     accept(options?: InvitationAcceptOptions): Promise<void>;
+    // @internal
     get autoSendAnInitialProvisionalResponse(): boolean;
     get body(): string | undefined;
     dispose(): Promise<void>;
@@ -108,7 +84,6 @@ export class Invitation extends Session {
 
 // @public
 export interface InvitationAcceptOptions {
-    extraHeaders?: Array<string>;
     sessionDescriptionHandlerModifiers?: Array<SessionDescriptionHandlerModifier>;
     sessionDescriptionHandlerOptions?: SessionDescriptionHandlerOptions;
 }
@@ -174,7 +149,9 @@ export interface InviterInviteOptions {
     requestDelegate?: OutgoingRequestDelegate;
     // Warning: (ae-forgotten-export) The symbol "RequestOptions" needs to be exported by the entry point index.d.ts
     requestOptions?: RequestOptions;
+    // (undocumented)
     sessionDescriptionHandlerModifiers?: Array<SessionDescriptionHandlerModifier>;
+    // (undocumented)
     sessionDescriptionHandlerOptions?: SessionDescriptionHandlerOptions;
     withoutSdp?: boolean;
 }
@@ -198,9 +175,7 @@ export interface InviterOptions extends SessionOptions {
     // @deprecated (undocumented)
     rendertype?: string;
     sessionDescriptionHandlerModifiers?: Array<SessionDescriptionHandlerModifier>;
-    sessionDescriptionHandlerModifiersReInvite?: Array<SessionDescriptionHandlerModifier>;
     sessionDescriptionHandlerOptions?: SessionDescriptionHandlerOptions;
-    sessionDescriptionHandlerOptionsReInvite?: SessionDescriptionHandlerOptions;
 }
 
 // @public
@@ -208,6 +183,9 @@ export type LogConnector = (level: LogLevel, category: string, label: string | u
 
 // @public
 export type LogLevel = "debug" | "log" | "warn" | "error";
+
+// @internal
+export function _makeEmitter<T>(eventEmitter: EventEmitter, eventName?: string): Emitter<T>;
 
 // @public
 export class Message {
@@ -359,7 +337,6 @@ export interface RegistererOptions {
         toDisplayName?: string;
         toUri?: URI;
     };
-    refreshFrequency?: number;
     regId?: number;
     registrar?: URI;
 }
@@ -451,6 +428,8 @@ export abstract class Session {
     message(options?: SessionMessageOptions): Promise<OutgoingMessageRequest>;
     // @internal
     _message(delegate?: OutgoingRequestDelegate, options?: RequestOptions): Promise<OutgoingMessageRequest>;
+    // Warning: (ae-forgotten-export) The symbol "IncomingAckRequest" needs to be exported by the entry point index.d.ts
+    //
     // @internal
     protected onAckRequest(request: IncomingAckRequest): Promise<void>;
     // @internal
@@ -489,14 +468,10 @@ export abstract class Session {
     protected rollbackOffer(): Promise<void>;
     get sessionDescriptionHandler(): SessionDescriptionHandler | undefined;
     get sessionDescriptionHandlerFactory(): SessionDescriptionHandlerFactory;
-    get sessionDescriptionHandlerModifiers(): Array<SessionDescriptionHandlerModifier>;
-    set sessionDescriptionHandlerModifiers(modifiers: Array<SessionDescriptionHandlerModifier>);
-    get sessionDescriptionHandlerModifiersReInvite(): Array<SessionDescriptionHandlerModifier>;
-    set sessionDescriptionHandlerModifiersReInvite(modifiers: Array<SessionDescriptionHandlerModifier>);
-    get sessionDescriptionHandlerOptions(): SessionDescriptionHandlerOptions;
-    set sessionDescriptionHandlerOptions(options: SessionDescriptionHandlerOptions);
-    get sessionDescriptionHandlerOptionsReInvite(): SessionDescriptionHandlerOptions;
-    set sessionDescriptionHandlerOptionsReInvite(options: SessionDescriptionHandlerOptions);
+    // @internal (undocumented)
+    protected _sessionDescriptionHandlerModifiers: Array<SessionDescriptionHandlerModifier> | undefined;
+    // @internal (undocumented)
+    protected _sessionDescriptionHandlerOptions: SessionDescriptionHandlerOptions | undefined;
     // @internal
     protected setAnswer(answer: Body, options: {
         sessionDescriptionHandlerOptions?: SessionDescriptionHandlerOptions;
@@ -526,14 +501,12 @@ export interface SessionByeOptions {
 
 // @public
 export interface SessionDelegate {
-    onAck?(ack: Ack): void;
     onBye?(bye: Bye): void;
     onInfo?(info: Info): void;
     onInvite?(request: IncomingRequestMessage, response: string, statusCode: number): void;
     onMessage?(message: Message): void;
     onNotify?(notification: Notification): void;
     onRefer?(referral: Referral): void;
-    onSessionDescriptionHandler?(sessionDescriptionHandler: SessionDescriptionHandler, provisional: boolean): void;
 }
 
 // @public
@@ -541,6 +514,7 @@ export interface SessionDescriptionHandler {
     close(): void;
     getDescription(options?: SessionDescriptionHandlerOptions, modifiers?: Array<SessionDescriptionHandlerModifier>): Promise<BodyAndContentType>;
     hasDescription(contentType: string): boolean;
+    holdModifier(sessionDescription: RTCSessionDescriptionInit): Promise<RTCSessionDescriptionInit>;
     rollbackDescription?(): Promise<void>;
     sendDtmf(tones: string, options?: unknown): boolean;
     setDescription(sdp: string, options?: SessionDescriptionHandlerOptions, modifiers?: Array<SessionDescriptionHandlerModifier>): Promise<void>;
@@ -578,7 +552,9 @@ export interface SessionInfoOptions {
 export interface SessionInviteOptions {
     requestDelegate?: OutgoingRequestDelegate;
     requestOptions?: RequestOptions;
+    // (undocumented)
     sessionDescriptionHandlerModifiers?: Array<SessionDescriptionHandlerModifier>;
+    // (undocumented)
     sessionDescriptionHandlerOptions?: SessionDescriptionHandlerOptions;
     withoutSdp?: boolean;
 }
@@ -816,16 +792,11 @@ export interface UserAgentDelegate {
 // @public
 export interface UserAgentOptions {
     allowLegacyNotifications?: boolean;
-    authorizationHa1?: string;
     authorizationPassword?: string;
     authorizationUsername?: string;
     // @deprecated (undocumented)
     autoStart?: boolean;
     autoStop?: boolean;
-    contactName?: string;
-    contactParams?: {
-        [name: string]: string;
-    };
     delegate?: UserAgentDelegate;
     displayName?: string;
     forceRport?: boolean;
@@ -835,6 +806,8 @@ export interface UserAgentOptions {
     hackIpInContact?: boolean | string;
     // @deprecated
     hackViaTcp?: boolean;
+    // @deprecated
+    hackWssInTransport?: boolean;
     logBuiltinEnabled?: boolean;
     logConfiguration?: boolean;
     logConnector?: LogConnector;
@@ -845,7 +818,6 @@ export interface UserAgentOptions {
     reconnectionAttempts?: number;
     // @deprecated (undocumented)
     reconnectionDelay?: number;
-    sendInitialProvisionalResponse?: boolean;
     sessionDescriptionHandlerFactory?: SessionDescriptionHandlerFactory;
     sessionDescriptionHandlerFactoryOptions?: object;
     sipExtension100rel?: SIPExtension;

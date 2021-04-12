@@ -144,14 +144,11 @@ export class UserAgentClient implements OutgoingRequest {
     if (this.transaction.state === TransactionState.Proceeding) {
       new UserAgentClient(NonInviteClientTransaction, this.core, message);
     } else {
-      this.transaction.addStateChangeListener(
-        () => {
-          if (this.transaction && this.transaction.state === TransactionState.Proceeding) {
-            new UserAgentClient(NonInviteClientTransaction, this.core, message);
-          }
-        },
-        { once: true }
-      );
+      this.transaction.once("stateChanged", () => {
+        if (this.transaction && this.transaction.state === TransactionState.Proceeding) {
+          new UserAgentClient(NonInviteClientTransaction, this.core, message);
+        }
+      });
     }
 
     return message;

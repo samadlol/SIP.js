@@ -4,11 +4,6 @@
 
 ## SimpleUser.remoteAudioTrack property
 
-> Warning: This API is now obsolete.
-> 
-> Use remoteMediaStream and get track from the stream.
-> 
-
 The remote audio track, if available.
 
 <b>Signature:</b>

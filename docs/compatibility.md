@@ -2,8 +2,7 @@
 
 SimpleUser, the API framework and core libraries are published...
 - as standard ES2017 using standard modules (ES2015)
-- with support for tree shaking and without side effects
-- but not bundled, not minified, not using .mjs file extensions
+- not bundled, not minified, not using .mjs file extensions
 
 ## Can you provide an ES5 UMD minified bundle?
 No. There are a number of build tools available which can transform what's published to whatever single format is needed - for example, Babel and Webpack.

@@ -4,7 +4,7 @@
 /* eslint-disable @typescript-eslint/no-use-before-define */
 import { SimpleUser, SimpleUserDelegate, SimpleUserOptions } from "../src/platform/web";
 import { nameAlice, nameBob, uriAlice, uriBob, webSocketServerAlice, webSocketServerBob } from "./demo-users";
-import { getButton, getInput, getVideo } from "./demo-utils";
+import { getButton, getVideo } from "./demo-utils";
 
 const connectAlice = getButton("connectAlice");
 const connectBob = getButton("connectBob");
@@ -18,10 +18,6 @@ const beginAlice = getButton("beginAlice");
 const beginBob = getButton("beginBob");
 const endAlice = getButton("endAlice");
 const endBob = getButton("endBob");
-const holdAlice = getInput("holdAlice");
-const holdBob = getInput("holdBob");
-const muteAlice = getInput("muteAlice");
-const muteBob = getInput("muteBob");
 const videoLocalAlice = getVideo("videoLocalAlice");
 const videoLocalBob = getVideo("videoLocalBob");
 const videoRemoteAlice = getVideo("videoRemoteAlice");
@@ -40,8 +36,6 @@ const alice = buildUser(
   unregisterAlice,
   beginAlice,
   endAlice,
-  holdAlice,
-  muteAlice,
   videoLocalAlice,
   videoRemoteAlice
 );
@@ -59,15 +53,9 @@ const bob = buildUser(
   unregisterBob,
   beginBob,
   endBob,
-  holdBob,
-  muteBob,
   videoLocalBob,
   videoRemoteBob
 );
-
-if (!alice || !bob) {
-  console.error("Something went wrong");
-}
 
 function buildUser(
   webSocketServer: string,
@@ -81,8 +69,6 @@ function buildUser(
   unregisterButton: HTMLButtonElement,
   beginButton: HTMLButtonElement,
   endButton: HTMLButtonElement,
-  holdCheckbox: HTMLInputElement,
-  muteCheckbox: HTMLInputElement,
   videoLocalElement: HTMLVideoElement,
   videoRemoteElement: HTMLVideoElement
 ): SimpleUser {
@@ -105,7 +91,6 @@ function buildUser(
       }
     },
     userAgentOptions: {
-      // logLevel: "debug",
       displayName
     }
   };
@@ -115,11 +100,9 @@ function buildUser(
 
   // SimpleUser delegate
   const delegate: SimpleUserDelegate = {
-    onCallAnswered: makeCallAnsweredCallback(user, holdCheckbox, muteCheckbox),
-    onCallCreated: makeCallCreatedCallback(user, beginButton, endButton, holdCheckbox, muteCheckbox),
+    onCallCreated: makeCallCreatedCallback(user, beginButton, endButton),
     onCallReceived: makeCallReceivedCallback(user),
-    onCallHangup: makeCallHangupCallback(user, beginButton, endButton, holdCheckbox, muteCheckbox),
-    onCallHold: makeCallHoldCallback(user, holdCheckbox),
+    onCallHangup: makeCallHangupCallback(user, beginButton, endButton),
     onRegistered: makeRegisteredCallback(user, registerButton, unregisterButton),
     onUnregistered: makeUnregisteredCallback(user, registerButton, unregisterButton),
     onServerConnect: makeServerConnectCallback(user, connectButton, disconnectButton, registerButton, beginButton),
@@ -151,29 +134,10 @@ function buildUser(
   // Setup end button click listeners
   endButton.addEventListener("click", makeEndButtonClickListener(user));
 
-  // Setup hold change listeners
-  holdCheckbox.addEventListener("change", makeHoldCheckboxClickListener(user, holdCheckbox));
-
-  // Setup mute change listeners
-  muteCheckbox.addEventListener("change", makeMuteCheckboxClickListener(user, muteCheckbox));
-
   // Enable connect button
   connectButton.disabled = false;
 
   return user;
-}
-
-// Helper function to create call anaswered callback
-function makeCallAnsweredCallback(
-  user: SimpleUser,
-  holdCheckbox: HTMLInputElement,
-  muteCheckbox: HTMLInputElement
-): () => void {
-  return () => {
-    console.log(`[${user.id}] call answered`);
-    holdCheckboxDisabled(false, holdCheckbox);
-    muteCheckboxDisabled(false, muteCheckbox);
-  };
 }
 
 // Helper function to create call received callback
@@ -192,16 +156,12 @@ function makeCallReceivedCallback(user: SimpleUser): () => void {
 function makeCallCreatedCallback(
   user: SimpleUser,
   beginButton: HTMLButtonElement,
-  endButton: HTMLButtonElement,
-  holdCheckbox: HTMLInputElement,
-  muteCheckbox: HTMLInputElement
+  endButton: HTMLButtonElement
 ): () => void {
   return () => {
     console.log(`[${user.id}] call created`);
     beginButton.disabled = true;
     endButton.disabled = false;
-    holdCheckboxDisabled(true, holdCheckbox);
-    muteCheckboxDisabled(true, muteCheckbox);
   };
 }
 
@@ -209,24 +169,12 @@ function makeCallCreatedCallback(
 function makeCallHangupCallback(
   user: SimpleUser,
   beginButton: HTMLButtonElement,
-  endButton: HTMLButtonElement,
-  holdCheckbox: HTMLInputElement,
-  muteCheckbox: HTMLInputElement
+  endButton: HTMLButtonElement
 ): () => void {
   return () => {
     console.log(`[${user.id}] call hangup`);
     beginButton.disabled = !user.isConnected();
     endButton.disabled = true;
-    holdCheckboxDisabled(true, holdCheckbox);
-    muteCheckboxDisabled(true, muteCheckbox);
-  };
-}
-
-// Helper function to create call anaswered callback
-function makeCallHoldCallback(user: SimpleUser, holdCheckbox: HTMLInputElement): (held: boolean) => void {
-  return (held: boolean) => {
-    console.log(`[${user.id}] call hold ${held}`);
-    holdCheckbox.checked = held;
   };
 }
 
@@ -400,8 +348,7 @@ function makeBeginButtonClickListener(user: SimpleUser, target: string, targetDi
             message += `Or perhaps "${targetDisplay}" did not grant access to video?\n`;
             alert(message);
           }
-        },
-        withoutSdp: false
+        }
       })
       .catch((error: Error) => {
         console.error(`[${user.id}] failed to begin session`);
@@ -421,61 +368,3 @@ function makeEndButtonClickListener(user: SimpleUser): () => void {
     });
   };
 }
-
-// Helper function to setup click handler for hold checkbox
-function makeHoldCheckboxClickListener(user: SimpleUser, holdCheckbox: HTMLInputElement): () => void {
-  return () => {
-    if (holdCheckbox.checked) {
-      // Checkbox is checked..
-      user.hold().catch((error: Error) => {
-        holdCheckbox.checked = false;
-        console.error(`[${user.id}] failed to hold call`);
-        console.error(error);
-        alert("Failed to hold call.\n" + error);
-      });
-    } else {
-      // Checkbox is not checked..
-      user.unhold().catch((error: Error) => {
-        holdCheckbox.checked = true;
-        console.error(`[${user.id}] failed to unhold call`);
-        console.error(error);
-        alert("Failed to unhold call.\n" + error);
-      });
-    }
-  };
-}
-
-// Hold helper function
-const holdCheckboxDisabled = (disabled: boolean, holdCheckbox: HTMLInputElement): void => {
-  holdCheckbox.checked = false;
-  holdCheckbox.disabled = disabled;
-};
-
-// Helper function to setup click handler for mute checkbox
-function makeMuteCheckboxClickListener(user: SimpleUser, muteCheckbox: HTMLInputElement): () => void {
-  return () => {
-    if (muteCheckbox.checked) {
-      // Checkbox is checked..
-      user.mute();
-      if (user.isMuted() === false) {
-        muteCheckbox.checked = false;
-        console.error(`[${user.id}] failed to mute call`);
-        alert("Failed to mute call.\n");
-      }
-    } else {
-      // Checkbox is not checked..
-      user.unmute();
-      if (user.isMuted() === true) {
-        muteCheckbox.checked = true;
-        console.error(`[${user.id}] failed to unmute call`);
-        alert("Failed to unmute call.\n");
-      }
-    }
-  };
-}
-
-// Mute helper function
-const muteCheckboxDisabled = (disabled: boolean, muteCheckbox: HTMLInputElement): void => {
-  muteCheckbox.checked = false;
-  muteCheckbox.disabled = disabled;
-};

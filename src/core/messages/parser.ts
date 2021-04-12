@@ -243,8 +243,8 @@ export namespace Parser {
 
       const parsedHeader = parseHeader(message, data, headerStart, headerEnd);
 
-      if (parsedHeader && parsedHeader !== true) {
-        logger.error(parsedHeader.error);
+      if (parsedHeader !== true) {
+        logger.error(parsed.error);
         return;
       }
 

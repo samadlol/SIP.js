@@ -4,8 +4,6 @@
 
 ## SessionDialog.reliableSequenceGuard() method
 
-Guard against out of order reliable provisional responses and retransmissions. Returns false if the response should be discarded, otherwise true.
-
 <b>Signature:</b>
 
 ```typescript
@@ -16,7 +14,7 @@ reliableSequenceGuard(message: IncomingResponseMessage): boolean;
 
 |  Parameter | Type | Description |
 |  --- | --- | --- |
-|  message | <code>IncomingResponseMessage</code> | Incoming response message within this dialog. |
+|  message | <code>IncomingResponseMessage</code> |  |
 
 <b>Returns:</b>
 

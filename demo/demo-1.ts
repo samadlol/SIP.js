@@ -65,7 +65,6 @@ const simpleUserOptions: SimpleUserOptions = {
     }
   },
   userAgentOptions: {
-    // logLevel: "debug",
     displayName
   }
 };
@@ -99,15 +98,11 @@ connectButton.addEventListener("click", () => {
 callButton.addEventListener("click", () => {
   callButton.disabled = true;
   hangupButton.disabled = true;
-  simpleUser
-    .call(target, {
-      inviteWithoutSdp: false
-    })
-    .catch((error: Error) => {
-      console.error(`[${simpleUser.id}] failed to place call`);
-      console.error(error);
-      alert("Failed to place call.\n" + error);
-    });
+  simpleUser.call(target).catch((error: Error) => {
+    console.error(`[${simpleUser.id}] failed to place call`);
+    console.error(error);
+    alert("Failed to place call.\n" + error);
+  });
 });
 
 // Add click listener to hangup button

@@ -1,3 +1,5 @@
+import { EventEmitter } from "events";
+
 import {
   Body,
   C,
@@ -8,7 +10,7 @@ import {
   OutgoingRequestMessage,
   URI
 } from "../core";
-import { Emitter, EmitterImpl } from "./emitter";
+import { _makeEmitter, Emitter } from "./emitter";
 import { PublisherOptions } from "./publisher-options";
 import { PublisherPublishOptions } from "./publisher-publish-options";
 import { PublisherState } from "./publisher-state";
@@ -38,7 +40,7 @@ export class Publisher {
   /** The publication state. */
   private _state: PublisherState = PublisherState.Initial;
   /** Emits when the registration state changes. */
-  private _stateEventEmitter: EmitterImpl<PublisherState>;
+  private _stateEventEmitter = new EventEmitter();
 
   /**
    * Constructs a new instance of the `Publisher` class.
@@ -49,9 +51,6 @@ export class Publisher {
    * @param options - Options bucket. See {@link PublisherOptions} for details.
    */
   public constructor(userAgent: UserAgent, targetURI: URI, eventType: string, options: PublisherOptions = {}) {
-    // state emitter
-    this._stateEventEmitter = new EmitterImpl<PublisherState>();
-
     this.userAgent = userAgent;
 
     options.extraHeaders = (options.extraHeaders || []).slice();
@@ -145,7 +144,7 @@ export class Publisher {
 
   /** Emits when the publisher state changes. */
   public get stateChange(): Emitter<PublisherState> {
-    return this._stateEventEmitter;
+    return _makeEmitter(this._stateEventEmitter);
   }
 
   /**
@@ -229,9 +228,7 @@ export class Publisher {
         if (this.pubRequestExpires !== 0) {
           // Schedule refresh
           this.publishRefreshTimer = setTimeout(() => this.refreshRequest(), this.pubRequestExpires * 900);
-          if (this._state !== PublisherState.Published) {
-            this.stateTransition(PublisherState.Published);
-          }
+          this.stateTransition(PublisherState.Published);
         } else {
           this.stateTransition(PublisherState.Unpublished);
         }
@@ -410,7 +407,7 @@ export class Publisher {
     // Transition
     this._state = newState;
     this.logger.log(`Publication transitioned to state ${this._state}`);
-    this._stateEventEmitter.emit(this._state);
+    this._stateEventEmitter.emit("event", this._state);
 
     // Dispose
     if (newState === PublisherState.Terminated) {

@@ -1,3 +1,5 @@
+import { EventEmitter } from "events";
+
 import { TransportError } from "../exceptions";
 import { Logger } from "../log";
 import { Transport } from "../transport";
@@ -19,10 +21,8 @@ import { TransactionUser } from "./transaction-user";
  * https://tools.ietf.org/html/rfc3261#section-17
  * @public
  */
-export abstract class Transaction {
+export abstract class Transaction extends EventEmitter {
   protected logger: Logger;
-
-  private listeners = new Array<() => void>();
 
   protected constructor(
     private _transport: Transport,
@@ -31,6 +31,7 @@ export abstract class Transaction {
     private _state: TransactionState,
     loggerCategory: string
   ) {
+    super();
     this.logger = _user.loggerFactory.getLogger(loggerCategory, _id);
     this.logger.debug(`Constructing ${this.typeToString()} with id ${this.id}.`);
   }
@@ -69,35 +70,11 @@ export abstract class Transaction {
     return this._transport;
   }
 
-  /**
-   * Sets up a function that will be called whenever the transaction state changes.
-   * @param listener - Callback function.
-   * @param options - An options object that specifies characteristics about the listener.
-   *                  If once true, indicates that the listener should be invoked at most once after being added.
-   *                  If once true, the listener would be automatically removed when invoked.
-   */
-  public addStateChangeListener(listener: () => void, options?: { once?: boolean }): void {
-    const onceWrapper = (): void => {
-      this.removeStateChangeListener(onceWrapper);
-      listener();
-    };
-    options?.once === true ? this.listeners.push(onceWrapper) : this.listeners.push(listener);
-  }
-
-  /**
-   * This is currently public so tests may spy on it.
-   * @internal
-   */
-  public notifyStateChangeListeners(): void {
-    this.listeners.slice().forEach((listener) => listener());
-  }
-
-  /**
-   * Removes a listener previously registered with addStateListener.
-   * @param listener - Callback function.
-   */
-  public removeStateChangeListener(listener: () => void): void {
-    this.listeners = this.listeners.filter((l) => l !== listener);
+  /** Subscribe to 'stateChanged' event. */
+  public on(name: "stateChanged", callback: () => void): this;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  public on(name: string, callback: (...args: any[]) => void): this {
+    return super.on(name, callback);
   }
 
   protected logTransportError(error: TransportError, message: string): void {
@@ -138,7 +115,7 @@ export abstract class Transaction {
     if (this._user.onStateChange) {
       this._user.onStateChange(state);
     }
-    this.notifyStateChangeListeners();
+    this.emit("stateChanged");
   }
 
   protected typeToString(): string {

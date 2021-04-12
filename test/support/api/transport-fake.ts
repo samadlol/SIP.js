@@ -1,10 +1,18 @@
-import { Emitter, EmitterImpl, Transport, TransportState } from "../../../src/api";
+import { EventEmitter } from "events";
+
+import {
+  _makeEmitter,
+  Emitter,
+  Transport,
+  TransportState
+} from "../../../src/api";
 import { Logger } from "../../../src/core";
 
 type ResolveFunction = () => void;
 type RejectFunction = (reason: Error) => void;
 
-export class TransportFake implements Transport {
+export class TransportFake extends EventEmitter implements Transport {
+
   public onConnect: (() => void) | undefined;
   public onDisconnect: ((error?: Error) => void) | undefined;
   public onMessage: ((message: string) => void) | undefined;
@@ -20,9 +28,11 @@ export class TransportFake implements Transport {
 
   private _receiveDropOnce = false;
   private _state: TransportState = TransportState.Disconnected;
-  private _stateEventEmitter = new EmitterImpl<TransportState>();
+  private _stateEventEmitter = new EventEmitter();
 
-  constructor(private logger: Logger) {}
+  constructor(private logger: Logger) {
+    super();
+  }
 
   public set id(id: string) {
     this._id = id;
@@ -37,7 +47,7 @@ export class TransportFake implements Transport {
   }
 
   public get stateChange(): Emitter<TransportState> {
-    return this._stateEventEmitter;
+    return _makeEmitter(this._stateEventEmitter);
   }
 
   public connect(): Promise<void> {
@@ -45,7 +55,7 @@ export class TransportFake implements Transport {
   }
 
   public disconnect(): Promise<void> {
-    return this._disconnect();
+    return  this._disconnect();
   }
 
   public dispose(): Promise<void> {
@@ -53,9 +63,7 @@ export class TransportFake implements Transport {
   }
 
   public send(message: string): Promise<void> {
-    return this._send(message).then(() => {
-      return;
-    });
+    return this._send(message).then(() => { return; });
   }
 
   public isConnected(): boolean {
@@ -71,12 +79,12 @@ export class TransportFake implements Transport {
   }
 
   public receive(msg: string): void {
-    /*
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     let message = "";
     message += this._id ? `${this._id} ` : "";
-    message += `Receiving...\n${msg}`;
-    this.logger.log(message);
-    */
+    message +=  `Receiving...\n${msg}`;
+    // this.logger.log(message);
+    this.emit("message", msg);
     if (this._receiveDropOnce) {
       this._receiveDropOnce = false;
       this.logger.warn((this._id ? `${this._id} ` : "") + "Dropped message");
@@ -238,17 +246,25 @@ export class TransportFake implements Transport {
         }
         break;
       case TransportState.Connected:
-        if (newState !== TransportState.Disconnecting && newState !== TransportState.Disconnected) {
+        if (
+          newState !== TransportState.Disconnecting &&
+          newState !== TransportState.Disconnected
+        ) {
           invalidTransition();
         }
         break;
       case TransportState.Disconnecting:
-        if (newState !== TransportState.Connecting && newState !== TransportState.Disconnected) {
+        if (
+          newState !== TransportState.Connecting &&
+          newState !== TransportState.Disconnected
+        ) {
           invalidTransition();
         }
         break;
       case TransportState.Disconnected:
-        if (newState !== TransportState.Connecting) {
+        if (
+          newState !== TransportState.Connecting
+        ) {
           invalidTransition();
         }
         break;
@@ -260,7 +276,7 @@ export class TransportFake implements Transport {
     const oldState = this._state;
     this._state = newState;
     this.logger.log(`Transitioned from ${oldState} to ${this._state}`);
-    this._stateEventEmitter.emit(this._state);
+    this._stateEventEmitter.emit("event", this._state);
 
     //  Transition to Connected
     if (newState === TransportState.Connected) {
@@ -278,6 +294,24 @@ export class TransportFake implements Transport {
           this.onDisconnect();
         }
       }
+    }
+
+    // Legacy behavior
+    switch (this._state) {
+      case TransportState.Connecting:
+        this.emit("connecting");
+        break;
+      case TransportState.Connected:
+        this.emit("connected");
+        break;
+      case TransportState.Disconnecting:
+        this.emit("disconnecting");
+        break;
+      case TransportState.Disconnected:
+        this.emit("disconnected");
+        break;
+      default:
+        throw new Error("Unknown state.");
     }
   }
 }

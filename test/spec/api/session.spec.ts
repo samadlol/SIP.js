@@ -1,6 +1,11 @@
 /* eslint-disable @typescript-eslint/unbound-method */
 /* eslint-disable @typescript-eslint/no-use-before-define */
-import { Invitation, Inviter, SessionDescriptionHandler, SessionState } from "../../../src/api";
+import {
+  Invitation,
+  Inviter,
+  SessionDescriptionHandler,
+  SessionState
+} from "../../../src/api";
 import {
   Logger,
   OutgoingRequestDelegate,
@@ -34,9 +39,7 @@ function terminate(invitation: Invitation): Promise<void> {
     case SessionState.Establishing:
       return session.reject();
     case SessionState.Established:
-      return session.bye().then(() => {
-        return;
-      });
+      return session.bye().then(() => { return; });
     case SessionState.Terminating:
     case SessionState.Terminated:
     default:
@@ -57,12 +60,17 @@ describe("API Session", () => {
   let invitation: Invitation;
   let invitationStateSpy: EmitterSpy<SessionState>;
 
-  const inviterRequestDelegateMock = jasmine.createSpyObj<Required<OutgoingRequestDelegate>>(
-    "OutgoingRequestDelegate",
-    ["onAccept", "onProgress", "onRedirect", "onReject", "onTrying"]
-  );
+  const inviterRequestDelegateMock =
+    jasmine.createSpyObj<Required<OutgoingRequestDelegate>>("OutgoingRequestDelegate", [
+    "onAccept",
+    "onProgress",
+    "onRedirect",
+    "onReject",
+    "onTrying"
+  ]);
 
   function bobAccept(): void {
+
     beforeEach(async () => {
       resetSpies();
       invitation.accept();
@@ -123,9 +131,8 @@ describe("API Session", () => {
       threw = false;
       resetSpies();
       invitation.accept();
-      invitation.accept().catch(() => {
-        threw = true;
-      });
+      invitation.accept()
+        .catch(() => { threw = true; });
       await bob.transport.waitReceived(); // ACK
     });
 
@@ -461,9 +468,10 @@ describe("API Session", () => {
       threw = false;
       resetSpies();
       invitation.reject();
-      invitation.reject().catch(() => {
-        threw = true;
-      });
+      invitation.reject()
+        .catch(() => {
+          threw = true;
+        });
       await inviterStateSpy.wait(SessionState.Terminated);
     });
 
@@ -579,9 +587,10 @@ describe("API Session", () => {
       threw = false;
       resetSpies();
       terminate(invitation);
-      terminate(invitation).catch(() => {
-        threw = true;
-      });
+      terminate(invitation)
+        .catch(() => {
+          threw = true;
+        });
       await inviterStateSpy.wait(SessionState.Terminated);
     });
 
@@ -666,9 +675,8 @@ describe("API Session", () => {
     describe("Alice invite(), cancel()", () => {
       beforeEach(async () => {
         resetSpies();
-        inviter.invite().catch(() => {
-          return;
-        });
+        inviter.invite()
+          .catch(() => { return; });
         inviter.cancel();
         await soon();
         await soon(); // need an extra promise resolution for tests to play out
@@ -801,7 +809,8 @@ describe("API Session", () => {
     describe("Alice invite()", () => {
       beforeEach(async () => {
         resetSpies();
-        return inviter.invite({ requestDelegate: inviterRequestDelegateMock }).then(() => bob.transport.waitSent());
+        return inviter.invite({ requestDelegate: inviterRequestDelegateMock })
+          .then(() => bob.transport.waitSent());
       });
 
       it("her ua should send INVITE", () => {
@@ -886,7 +895,7 @@ describe("API Session", () => {
           resetSpies();
           spyOn(logger, "error").and.callThrough();
           inviter.cancel();
-          await invitation.accept().then(() => (acceptResolve = true));
+          await invitation.accept().then(() => acceptResolve = true);
         });
 
         it("his call to accept() should resolve and log an error", async () => {
@@ -937,18 +946,16 @@ describe("API Session", () => {
           invitation.accept();
           if (inviteWithoutSdp) {
             return Promise.resolve().then(() =>
-              Promise.resolve().then(() => Promise.resolve().then(() => Promise.resolve().then(() => inviter.cancel())))
-            );
+              Promise.resolve().then(() =>
+                Promise.resolve().then(() =>
+                  Promise.resolve().then(() => inviter.cancel()))));
           } else {
             return Promise.resolve().then(() =>
               Promise.resolve().then(() =>
                 Promise.resolve().then(() =>
                   Promise.resolve().then(() =>
-                    Promise.resolve().then(() => Promise.resolve().then(() => inviter.cancel()))
-                  )
-                )
-              )
-            );
+                    Promise.resolve().then(() =>
+                      Promise.resolve().then(() => inviter.cancel()))))));
           }
         });
 
@@ -1012,8 +1019,7 @@ describe("API Session", () => {
           beforeEach(async () => {
             acceptReject = false;
             resetSpies();
-            {
-              // Setup hacky thing to cause undefined body returned once
+            { // Setup hacky thing to cause undefined body returned once
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               if (typeof (invitation as any).setupSessionDescriptionHandler !== "function") {
                 throw new Error("setupSessionDescriptionHandler() undefined.");
@@ -1027,7 +1033,7 @@ describe("API Session", () => {
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               (sdh as any).getDescriptionRejectOnce = true;
             }
-            await invitation.accept().catch(() => (acceptReject = true));
+            await invitation.accept().catch(() => acceptReject = true);
           });
 
           it("his call to accept() should reject", async () => {
@@ -1074,8 +1080,7 @@ describe("API Session", () => {
       describe("Bob accept(), 200 has no SDP - Invalid 200", () => {
         beforeEach(async () => {
           resetSpies();
-          {
-            // Setup hacky thing to cause undefined body returned once
+          { // Setup hacky thing to cause undefined body returned once
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             if (typeof (invitation as any).setupSessionDescriptionHandler !== "function") {
               throw new Error("setupSessionDescriptionHandler() undefined.");
@@ -1089,7 +1094,8 @@ describe("API Session", () => {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             (sdh as any).getDescriptionUndefinedBodyOnce = true;
           }
-          return invitation.accept().then(() => bob.transport.waitReceived());
+          return invitation.accept()
+            .then(() => bob.transport.waitReceived());
         });
 
         it("her ua should send ACK, BYE, 481", () => {
@@ -1147,8 +1153,7 @@ describe("API Session", () => {
       describe("Bob accept(), 200 SDP set fails - SDH Error", () => {
         beforeEach(async () => {
           resetSpies();
-          {
-            // Setup hacky thing to cause a rejection once
+          { // Setup hacky thing to cause a rejection once
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             if (typeof (inviter as any).setupSessionDescriptionHandler !== "function") {
               throw new Error("setupSessionDescriptionHandler() undefined.");
@@ -1161,7 +1166,8 @@ describe("API Session", () => {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             (inviter.sessionDescriptionHandler as any).setDescriptionRejectOnce = true;
           }
-          return invitation.accept().then(() => bob.transport.waitReceived()); // ACK
+          return invitation.accept()
+            .then(() => bob.transport.waitReceived()); // ACK
         });
 
         if (inviteWithoutSdp) {
@@ -1239,7 +1245,8 @@ describe("API Session", () => {
           }
           bob.userAgent.transport.setConnected(false);
           resetSpies();
-          return invitation.accept().then(() => soon(Timers.TIMER_H));
+          return invitation.accept()
+            .then(() => soon(Timers.TIMER_H));
         });
 
         afterEach(() => {
@@ -1270,8 +1277,7 @@ describe("API Session", () => {
         describe("Bob accept(), ACK has no SDP - Invalid ACK", () => {
           beforeEach(async () => {
             resetSpies();
-            {
-              // Setup hacky thing to cause undefined body returned once
+            { // Setup hacky thing to cause undefined body returned once
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               if (typeof (inviter as any).setupSessionDescriptionHandler !== "function") {
                 throw new Error("setupSessionDescriptionHandler() undefined.");
@@ -1284,7 +1290,8 @@ describe("API Session", () => {
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               (inviter.sessionDescriptionHandler as any).getDescriptionUndefinedBodyOnce = true;
             }
-            return invitation.accept().then(() => bob.transport.waitReceived()); // ACK
+            return invitation.accept()
+              .then(() => bob.transport.waitReceived());  // ACK
           });
 
           it("his ua should send 200, BYE", () => {
@@ -1306,8 +1313,7 @@ describe("API Session", () => {
         describe("Bob accept(), ACK SDP set fails - SDH Error", () => {
           beforeEach(async () => {
             resetSpies();
-            {
-              // Setup hacky thing to cause a rejection once
+            { // Setup hacky thing to cause a rejection once
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               if (typeof (invitation as any).setupSessionDescriptionHandler !== "function") {
                 throw new Error("setupSessionDescriptionHandler() undefined.");
@@ -1320,9 +1326,8 @@ describe("API Session", () => {
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               (invitation.sessionDescriptionHandler as any).setDescriptionRejectOnce = true;
             }
-            return invitation
-              .accept()
-              .then(() => bob.transport.waitReceived()) // ACK
+            return invitation.accept()
+              .then(() => bob.transport.waitReceived())  // ACK
               .then(() => bob.transport.waitReceived()); // 200
           });
 
@@ -1357,8 +1362,7 @@ describe("API Session", () => {
           }
           alice.userAgent.transport.setConnected(false);
           resetSpies();
-          return invitation
-            .accept()
+          return invitation.accept()
             .then(() => alice.transport.waitSent()) // ACK
             .then(() => soon(Timers.TIMER_L));
         });
@@ -1397,7 +1401,8 @@ describe("API Session", () => {
         beforeEach(async () => {
           resetSpies();
           alice.transportReceiveSpy.and.returnValue(Promise.resolve()); // drop messages
-          return invitation.accept().then(() => soon(Timers.TIMER_L));
+          return invitation.accept()
+            .then(() => soon(Timers.TIMER_L));
         });
 
         it("his ua should send 200, BYE", () => {
@@ -1423,8 +1428,7 @@ describe("API Session", () => {
           }
           alice.userAgent.transport.setConnected(false);
           resetSpies();
-          return invitation
-            .reject()
+          return invitation.reject()
             .then(() => alice.transport.waitSent()) // ACK
             .then(() => soon(Timers.TIMER_H));
         });
@@ -1525,9 +1529,9 @@ describe("API Session", () => {
           logger = invitation.userAgent.getLogger("sip.Invitation");
           resetSpies();
           spyOn(logger, "error").and.callThrough();
-          invitation.progress().then(() => (progressResolve = true));
+          invitation.progress().then(() => progressResolve = true);
           inviter.cancel();
-          await invitation.accept().then(() => (acceptResolve = true));
+          await invitation.accept().then(() => acceptResolve = true);
           // await invitationStateSpy.wait(SessionState.Terminated);
           // await soon();
         });
@@ -1579,9 +1583,9 @@ describe("API Session", () => {
           acceptResolve = false;
           resetSpies();
           spyOn(logger, "error").and.callThrough();
-          invitation.progress({ rel100: true }).then(() => (progressResolve = true));
+          invitation.progress({ rel100: true }).then(() => progressResolve = true);
           inviter.cancel();
-          await invitation.accept().then(() => (acceptResolve = true));
+          await invitation.accept().then(() => acceptResolve = true);
         });
 
         it("his call to progress(), accept() should resolve and log an error", async () => {
@@ -1631,8 +1635,8 @@ describe("API Session", () => {
           acceptReject = false;
           resetSpies();
           spyOn(logger, "error").and.callThrough();
-          invitation.progress({ rel100: true }).catch(() => (progressReject = true));
-          invitation.accept().catch(() => (acceptReject = true));
+          invitation.progress({ rel100: true }).catch(() => progressReject = true);
+          invitation.accept().catch(() => acceptReject = true);
           await invitation.dispose();
           await soon(); // need an extra promise resolution for tests to play out
           await soon(); // need an extra promise resolution for tests to play out
@@ -1743,18 +1747,6 @@ describe("API Session", () => {
           describe("Bob reject()", () => {
             bobReject();
           });
-
-          describe("Bob progress(reliable) ", () => {
-            bobProgressReliable();
-
-            describe("Bob accept()", () => {
-              bobAccept();
-            });
-
-            describe("Bob reject()", () => {
-              bobReject();
-            });
-          });
         });
 
         describe("Bob progress()", () => {
@@ -1777,18 +1769,6 @@ describe("API Session", () => {
 
             describe("Bob reject()", () => {
               bobReject();
-            });
-
-            describe("Bob progress(reliable) ", () => {
-              bobProgressReliable();
-
-              describe("Bob accept()", () => {
-                bobAccept();
-              });
-
-              describe("Bob reject()", () => {
-                bobReject();
-              });
             });
           });
         });
@@ -1834,9 +1814,7 @@ describe("API Session", () => {
     bob.transportReceiveSpy.calls.reset();
     bob.transportSendSpy.calls.reset();
     inviterStateSpy.calls.reset();
-    if (invitationStateSpy) {
-      invitationStateSpy.calls.reset();
-    }
+    if (invitationStateSpy) { invitationStateSpy.calls.reset(); }
     inviterRequestDelegateMock.onAccept.calls.reset();
     inviterRequestDelegateMock.onProgress.calls.reset();
     inviterRequestDelegateMock.onRedirect.calls.reset();
@@ -1852,8 +1830,7 @@ describe("API Session", () => {
   });
 
   afterEach(async () => {
-    return alice.userAgent
-      .stop()
+    return alice.userAgent.stop()
       .then(() => expect(alice.isShutdown()).toBe(true))
       .then(() => bob.userAgent.stop())
       .then(() => expect(bob.isShutdown()).toBe(true))
@@ -1911,7 +1888,8 @@ describe("API Session", () => {
     describe("Alice invite()", () => {
       beforeEach(() => {
         resetSpies();
-        return inviter.invite().then(() => bob.transport.waitSent());
+        return inviter.invite()
+          .then(() => bob.transport.waitSent());
       });
 
       it("her inviter sdh should have called get description once", () => {
@@ -1943,7 +1921,8 @@ describe("API Session", () => {
         describe("Bob accept()", () => {
           beforeEach(() => {
             resetSpies();
-            return invitation.accept().then(() => bob.transport.waitReceived());
+            return invitation.accept()
+              .then(() => bob.transport.waitReceived());
           });
 
           it("her inviter sdh should have called get & set description once", () => {
@@ -1976,7 +1955,8 @@ describe("API Session", () => {
           describe("Bob accept()", () => {
             beforeEach(() => {
               resetSpies();
-              return invitation.accept().then(() => bob.transport.waitReceived());
+              return invitation.accept()
+                .then(() => bob.transport.waitReceived());
             });
 
             it("her inviter sdh should have called get & set description once", () => {
@@ -2011,7 +1991,8 @@ describe("API Session", () => {
     describe("Alice invite()", () => {
       beforeEach(() => {
         resetSpies();
-        return inviter.invite().then(() => bob.transport.waitSent());
+        return inviter.invite()
+          .then(() => bob.transport.waitSent());
       });
 
       it("her inviter sdh should have called get description once", () => {
@@ -2164,6 +2145,7 @@ describe("API Session", () => {
     }
 
     function inviteSuiteFork(inviteWithoutSdp: boolean): void {
+
       it("her ua should send nothing", () => {
         expect(alice.transportSendSpy).not.toHaveBeenCalled();
       });
@@ -2222,9 +2204,7 @@ describe("API Session", () => {
       resetSpies();
       bob2.transportReceiveSpy.calls.reset();
       bob2.transportSendSpy.calls.reset();
-      if (invitationStateSpy2) {
-        invitationStateSpy2.calls.reset();
-      }
+      if (invitationStateSpy2) { invitationStateSpy2.calls.reset(); }
     }
 
     beforeEach(async () => {
@@ -2233,7 +2213,8 @@ describe("API Session", () => {
     });
 
     afterEach(async () => {
-      return bob2.userAgent.stop().then(() => expect(bob2.isShutdown()).toBe(true));
+      return bob2.userAgent.stop()
+        .then(() => expect(bob2.isShutdown()).toBe(true));
     });
 
     describe("Alice constructs a new INVITE targeting 2 Bobs with SDP offer", () => {

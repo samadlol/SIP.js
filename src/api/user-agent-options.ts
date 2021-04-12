@@ -39,12 +39,6 @@ export interface UserAgentOptions {
   allowLegacyNotifications?: boolean;
 
   /**
-   * Authorization ha1.
-   * @defaultValue `""`
-   */
-  authorizationHa1?: string;
-
-  /**
    * Authorization password.
    * @defaultValue `""`
    */
@@ -72,20 +66,6 @@ export interface UserAgentOptions {
    * @defaultValue `true`
    */
   autoStop?: boolean;
-
-  /**
-   * The user portion of user agent's contact URI.
-   * @remarks
-   * If not specifed a random string will be generated and utilized as the user portion of the contact URI.
-   * @defaultValue `""`
-   */
-  contactName?: string;
-
-  /**
-   * The URI parameters of the user agent's contact URI.
-   * @defaultValue `{ transport: "ws" }`
-   */
-  contactParams?: { [name: string]: string };
 
   /**
    * Delegate for {@link UserAgent}.
@@ -127,6 +107,12 @@ export interface UserAgentOptions {
    * @deprecated TBD
    */
   hackViaTcp?: boolean;
+
+  /**
+   * Hack
+   * @deprecated TBD
+   */
+  hackWssInTransport?: boolean;
 
   /**
    * Indicates whether log messages should be written to the browser console.
@@ -177,13 +163,6 @@ export interface UserAgentOptions {
    * @defaultValue 4
    */
   reconnectionDelay?: number;
-
-  /**
-   * If true, a first provisional response after the 100 Trying will be sent automatically if UAC does not
-   * require reliable provisional responses.
-   * @defaultValue `true`
-   */
-  sendInitialProvisionalResponse?: boolean;
 
   /**
    * A factory for generating `SessionDescriptionHandler` instances.

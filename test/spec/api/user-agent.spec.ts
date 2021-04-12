@@ -1,4 +1,5 @@
 import { UserAgentOptions } from "../../../src/api";
+import { URI } from "../../../src/core";
 import { connectUserFake, makeUserFake, UserFake } from "../../support/api/user-fake";
 import { soon } from "../../support/api/utils";
 
@@ -10,6 +11,8 @@ import { soon } from "../../support/api/utils";
 describe("API UserAgent", () => {
   let alice: UserFake;
   let bob: UserFake;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  let target: URI;
 
   beforeEach(async () => {
     jasmine.clock().install();
@@ -22,8 +25,7 @@ describe("API UserAgent", () => {
   });
 
   afterEach(async () => {
-    return alice.userAgent
-      .stop()
+    return alice.userAgent.stop()
       .then(() => expect(alice.isShutdown()).toBe(true))
       .then(() => bob.userAgent.stop())
       .then(() => expect(bob.isShutdown()).toBe(true))
@@ -32,6 +34,7 @@ describe("API UserAgent", () => {
 
   describe("Alice exists", () => {
     beforeEach(async () => {
+      target = bob.uri;
       await soon();
     });
 

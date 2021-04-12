@@ -7,7 +7,7 @@
 <b>Signature:</b>
 
 ```typescript
-setHeader(name: string, value: Array<string> | string): void;
+setHeader(name: string, value: any): void;
 ```
 
 ## Parameters
@@ -15,7 +15,7 @@ setHeader(name: string, value: Array<string> | string): void;
 |  Parameter | Type | Description |
 |  --- | --- | --- |
 |  name | <code>string</code> |  |
-|  value | <code>Array&lt;string&gt; &#124; string</code> |  |
+|  value | <code>any</code> |  |
 
 <b>Returns:</b>
 

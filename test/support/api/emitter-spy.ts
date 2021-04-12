@@ -44,19 +44,22 @@ export function makeEmitterSpy<T>(emitter: Emitter<T>, logger: Logger): EmitterS
     waitingForEmit = undefined;
   };
 
-  const spy = Object.assign(spyOn(emit, "listener").and.callThrough(), {
-    wait: async (value?: T): Promise<void> => {
-      if (waitingForEmitPromise) {
-        throw new Error("Already waiting for emit.");
+  const spy = Object.assign(
+    spyOn(emit, "listener").and.callThrough(),
+    {
+      wait: async (value?: T): Promise<void> => {
+        if (waitingForEmitPromise) {
+          throw new Error("Already waiting for emit.");
+        }
+        waitingForEmitPromise = new Promise<void>((resolve, reject) => {
+          waitingForEmitResolve = resolve;
+          waitingForEmitReject = reject;
+        });
+        waitingForEmit = value;
+        return waitingForEmitPromise;
       }
-      waitingForEmitPromise = new Promise<void>((resolve, reject) => {
-        waitingForEmitResolve = resolve;
-        waitingForEmitReject = reject;
-      });
-      waitingForEmit = value;
-      return waitingForEmitPromise;
     }
-  });
+  );
 
   emitter.on(emit.listener);
 

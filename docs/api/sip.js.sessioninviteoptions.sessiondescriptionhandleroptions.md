@@ -4,8 +4,6 @@
 
 ## SessionInviteOptions.sessionDescriptionHandlerOptions property
 
-Options to pass to SessionDescriptionHandler during re-INVITE transaction.
-
 <b>Signature:</b>
 
 ```typescript

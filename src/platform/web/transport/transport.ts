@@ -1,4 +1,6 @@
-import { Emitter, EmitterImpl } from "../../../api/emitter";
+import { EventEmitter } from "events";
+
+import { _makeEmitter, Emitter } from "../../../api/emitter";
 import { StateTransitionError } from "../../../api/exceptions";
 import { Transport as TransportDefinition } from "../../../api/transport";
 import { TransportState } from "../../../api/transport-state";
@@ -9,7 +11,7 @@ import { TransportOptions } from "./transport-options";
  * Transport for SIP over secure WebSocket (WSS).
  * @public
  */
-export class Transport implements TransportDefinition {
+export class Transport extends EventEmitter implements TransportDefinition {
   private static defaultOptions: Required<TransportOptions> = {
     server: "",
     connectionTimeout: 5,
@@ -24,7 +26,7 @@ export class Transport implements TransportDefinition {
 
   private _protocol: string;
   private _state: TransportState = TransportState.Disconnected;
-  private _stateEventEmitter: EmitterImpl<TransportState>;
+  private _stateEventEmitter = new EventEmitter();
   private _ws: WebSocket | undefined;
 
   private configuration: Required<TransportOptions>;
@@ -45,8 +47,7 @@ export class Transport implements TransportDefinition {
   private transitioningState = false;
 
   constructor(logger: Logger, options?: TransportOptions) {
-    // state emitter
-    this._stateEventEmitter = new EmitterImpl<TransportState>();
+    super();
 
     // logger
     this.logger = logger;
@@ -135,7 +136,7 @@ export class Transport implements TransportDefinition {
    * Transport state change emitter.
    */
   public get stateChange(): Emitter<TransportState> {
-    return this._stateEventEmitter;
+    return _makeEmitter(this._stateEventEmitter);
   }
 
   /**
@@ -191,6 +192,31 @@ export class Transport implements TransportDefinition {
     // layer SHOULD inform the transport user of a failure in sending.
     // https://tools.ietf.org/html/rfc3261#section-18.4
     return this._send(message);
+  }
+
+  /**
+   * Add listener for connection events.
+   * @deprecated Use `onConnected`, `onDisconnected` and/or `stateChange`.
+   */
+  public on(event: "connected" | "connecting" | "disconnecting" | "disconnected", listener: () => void): this;
+
+  /**
+   * Add listener for message event.
+   * @deprecated Use `onMessage`.
+   */
+  public on(event: "message", listener: (message: string) => void): this;
+
+  /**
+   * @internal
+   */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  public on(name: string, callback: (...args: any[]) => void): this {
+    const deprecatedMessage =
+      `A listener has been registered for the transport event "${name}". ` +
+      "Registering listeners for transport events has been deprecated and will no longer be available starting with SIP.js release 0.16.0. " +
+      "Please use the onConnected, onDisconnected, onMessage callbacks and/or the stateChange emitter instead. Please update accordingly.";
+    this.logger.warn(deprecatedMessage);
+    return super.on(name, callback);
   }
 
   private _connect(): Promise<void> {
@@ -492,6 +518,7 @@ export class Transport implements TransportDefinition {
         throw e; // rethrow unhandled exception
       }
     }
+    this.emit("message", finishedData);
   }
 
   /**
@@ -569,7 +596,8 @@ export class Transport implements TransportDefinition {
     this._state = newState;
 
     // Local copies of connect promises (guarding against callbacks changing them indirectly)
-    // const connectPromise = this.connectPromise;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const connectPromise = this.connectPromise;
     const connectResolve = this.connectResolve;
     const connectReject = this.connectReject;
 
@@ -581,7 +609,8 @@ export class Transport implements TransportDefinition {
     }
 
     // Local copies of disconnect promises (guarding against callbacks changing them indirectly)
-    // const disconnectPromise = this.disconnectPromise;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const disconnectPromise = this.disconnectPromise;
     const disconnectResolve = this.disconnectResolve;
     const disconnectReject = this.disconnectReject;
 
@@ -599,7 +628,7 @@ export class Transport implements TransportDefinition {
     }
 
     this.logger.log(`Transitioned from ${oldState} to ${this._state}`);
-    this._stateEventEmitter.emit(this._state);
+    this._stateEventEmitter.emit("event", this._state);
 
     //  Transition to Connected
     if (newState === TransportState.Connected) {
@@ -631,6 +660,24 @@ export class Transport implements TransportDefinition {
           throw e; // rethrow unhandled exception
         }
       }
+    }
+
+    // Legacy transport behavior (or at least what I believe the legacy transport was shooting for)
+    switch (newState) {
+      case TransportState.Connecting:
+        this.emit("connecting");
+        break;
+      case TransportState.Connected:
+        this.emit("connected");
+        break;
+      case TransportState.Disconnecting:
+        this.emit("disconnecting");
+        break;
+      case TransportState.Disconnected:
+        this.emit("disconnected");
+        break;
+      default:
+        throw new Error("Unknown state.");
     }
 
     // Complete connect promise

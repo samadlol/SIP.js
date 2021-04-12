@@ -7,7 +7,7 @@
 <b>Signature:</b>
 
 ```typescript
-deleteHeader(header: string): Array<string> | undefined;
+deleteHeader(header: string): any;
 ```
 
 ## Parameters
@@ -18,5 +18,5 @@ deleteHeader(header: string): Array<string> | undefined;
 
 <b>Returns:</b>
 
-`Array<string> | undefined`
+`any`
 
