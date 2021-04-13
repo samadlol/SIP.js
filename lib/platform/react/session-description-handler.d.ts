@@ -26,6 +26,7 @@ export declare class SessionDescriptionHandler extends EventEmitter implements S
      * Destructor
      */
     close(): void;
+    muteAndUnMute(mute: boolean): void;
     /**
      * Gets the local description from the underlying media implementation
      * @param {Object} [options] Options object to be used by getDescription
